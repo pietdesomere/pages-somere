@@ -244,7 +244,8 @@
           statusMessage.textContent = "Je verzoek werd succesvol verzonden. We nemen zo snel mogelijk contact met je op.";
           statusMessage.className = "status ok";
         } catch (error) {
-          statusMessage.textContent = error.message || "Er ging iets mis bij het verzenden.";
+          var fallback = "Als dit probleem blijft optreden, stuur je verzoek dan rechtstreeks naar privacy@somere.be.";
+          statusMessage.textContent = (error.message || "Er ging iets mis bij het verzenden.") + " " + fallback;
           statusMessage.className = "status error";
         } finally {
           submitButton.disabled = false;
