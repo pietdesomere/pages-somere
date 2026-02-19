@@ -108,6 +108,19 @@
       color: var(--warn);
       font-size: 0.95rem;
     }
+
+    .status {
+      font-size: 0.95rem;
+      margin-top: 0.35rem;
+    }
+
+    .status.ok {
+      color: #065f46;
+    }
+
+    .status.error {
+      color: var(--warn);
+    }
   </style>
 </head>
 <body>
@@ -120,9 +133,9 @@
     <h2>Hoe dien je een verwijderingsverzoek in?</h2>
     <ol>
       <li>Vul het formulier hieronder volledig in.</li>
-      <li>Klik op <strong>"Verzoek per e-mail opstellen"</strong>.</li>
-      <li>Je e-mailapp opent met een vooraf ingevulde e-mail naar <code>privacy@somere.be</code>.</li>
-      <li>Verstuur de e-mail om je verzoek officieel in te dienen.</li>
+      <li>Klik op <strong>"Verzoek verzenden"</strong>.</li>
+      <li>Je verzoek wordt rechtstreeks doorgestuurd naar <code>privacy@somere.be</code>.</li>
+      <li>Na succesvolle verzending krijg je hieronder een bevestiging.</li>
     </ol>
 
     <h2>Welke gegevens verwijderen we en welke kunnen we bewaren?</h2>
@@ -136,6 +149,7 @@
 
     <form id="deletionForm">
       <input type="hidden" id="appName" name="appName" value="Present">
+      <input type="hidden" id="honeypot" name="honeypot" value="">
 
       <label for="fullName">
         Naam
@@ -166,53 +180,76 @@
         <textarea id="details" name="details" placeholder="Omschrijf hier eventueel welke gegevens je precies wil laten verwijderen."></textarea>
       </label>
 
-      <button class="submit" type="submit">Verzoek per e-mail opstellen</button>
-      <p class="warning">Opmerking: zonder backend kan deze pagina niet automatisch e-mails versturen. Je e-mailapp wordt geopend zodat je zelf kan verzenden.</p>
+      <button class="submit" type="submit">Verzoek verzenden</button>
+      <p class="hint">We versturen je verzoek veilig naar ons privacyteam.</p>
+      <p id="statusMessage" class="status" aria-live="polite"></p>
     </form>
   </main>
 
   <script>
     (function () {
       var form = document.getElementById("deletionForm");
-      var targetEmail = "privacy@somere.be";
+      var submitButton = form.querySelector("button[type='submit']");
+      var statusMessage = document.getElementById("statusMessage");
+      var endpoint = "https://mail-sender-production.up.railway.app/send-delete-request";
 
-      form.addEventListener("submit", function (event) {
+      form.addEventListener("submit", async function (event) {
         event.preventDefault();
 
         var appName = document.getElementById("appName").value;
+        var honeypot = document.getElementById("honeypot").value;
         var fullName = document.getElementById("fullName").value.trim();
         var email = document.getElementById("email").value.trim();
         var accountIdentifier = document.getElementById("accountIdentifier").value.trim();
         var requestType = document.getElementById("requestType").value;
         var details = document.getElementById("details").value.trim();
 
-        var subject = "Verzoek gegevensverwijdering - " + appName;
-        var lines = [
-          "Beste privacyteam van Somere BV,",
-          "",
-          "Ik wil een verzoek indienen met betrekking tot mijn persoonsgegevens.",
-          "",
-          "App: " + appName,
-          "Type verzoek: " + requestType,
-          "Naam: " + fullName,
-          "Contact e-mail: " + email,
-          "Account-identificatie: " + accountIdentifier,
-          "",
-          "Toelichting:",
-          details || "(geen extra toelichting)",
-          "",
-          "Gelieve mij een bevestiging van ontvangst te sturen.",
-          "",
-          "Met vriendelijke groeten,",
-          fullName
-        ];
+        statusMessage.textContent = "";
+        statusMessage.className = "status";
+        submitButton.disabled = true;
+        submitButton.textContent = "Bezig met verzenden...";
 
-        var body = lines.join("\n");
-        var mailto = "mailto:" + encodeURIComponent(targetEmail)
-          + "?subject=" + encodeURIComponent(subject)
-          + "&body=" + encodeURIComponent(body);
+        try {
+          var response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              appName: appName,
+              fullName: fullName,
+              email: email,
+              accountIdentifier: accountIdentifier,
+              requestType: requestType,
+              details: details,
+              honeypot: honeypot
+            })
+          });
 
-        window.location.href = mailto;
+          if (!response.ok) {
+            var errorText = "Verzenden mislukt. Probeer later opnieuw.";
+            try {
+              var data = await response.json();
+              if (data && data.error) {
+                errorText = "Verzenden mislukt: " + data.error;
+              }
+            } catch (_ignore) {
+            }
+            throw new Error(errorText);
+          }
+
+          form.reset();
+          document.getElementById("appName").value = "Present";
+          document.getElementById("honeypot").value = "";
+          statusMessage.textContent = "Je verzoek werd succesvol verzonden. We nemen zo snel mogelijk contact met je op.";
+          statusMessage.className = "status ok";
+        } catch (error) {
+          statusMessage.textContent = error.message || "Er ging iets mis bij het verzenden.";
+          statusMessage.className = "status error";
+        } finally {
+          submitButton.disabled = false;
+          submitButton.textContent = "Verzoek verzenden";
+        }
       });
     })();
   </script>
