@@ -3,13 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Somere BV</title>
+  <title>Somere BV - Android apps en websites</title>
+  <meta name="description" content="Somere BV bouwt eenvoudige Android apps en websites, AI-assisted, snel en tegen lage kost.">
   <style>
     :root {
       color-scheme: light;
       --bg: #f7f9fc;
       --card: #ffffff;
       --text: #1f2937;
+      --muted: #4b5563;
       --accent: #0f766e;
       --border: #e5e7eb;
     }
@@ -18,34 +20,93 @@
 
     body {
       margin: 0;
-      min-height: 100vh;
-      display: grid;
-      place-items: center;
       background: var(--bg);
       color: var(--text);
       font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.6;
     }
 
     main {
       width: min(900px, calc(100% - 2rem));
-      padding: 2rem;
+      margin: 2rem auto;
+      padding: 2rem 2rem 1.6rem;
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 12px;
-      text-align: center;
     }
 
     h1 {
-      margin: 0;
+      margin: 0 0 0.35rem;
       line-height: 1.25;
       font-size: 2rem;
       color: var(--accent);
+    }
+
+    h2 {
+      margin: 1.5rem 0 0.6rem;
+      font-size: 1.2rem;
+    }
+
+    p {
+      margin: 0.6rem 0 1rem;
+    }
+
+    ul {
+      margin: 0.4rem 0 1rem;
+      padding-left: 1.3rem;
+    }
+
+    li {
+      margin: 0.3rem 0;
+    }
+
+    .subtitle {
+      margin-top: 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .contact {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1rem 0.5rem;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
   <main>
     <h1>Somere BV</h1>
+    <p class="subtitle">Eenvoudige Android apps en websites, AI-assisted, snel en tegen lage kost.</p>
+
+    <h2>Wat we doen</h2>
+    <p>Somere BV helpt zelfstandigen, kleine ondernemingen en verenigingen met praktische digitale oplossingen:</p>
+    <ul>
+      <li>Android apps op maat</li>
+      <li>Websites en webpagina's die snel online kunnen</li>
+      <li>Snelle oplevering met slimme inzet van AI-tools</li>
+      <li>Betaalbare aanpak met focus op eenvoud en resultaat</li>
+    </ul>
+
+    <h2>Contact</h2>
+    <div class="contact">
+      <p><strong>Somere BV</strong><br>
+      Piet De Somere<br>
+      Kasteeldreef 62<br>
+      9920 Lievegem</p>
+
+      <p><strong>Gsm:</strong> <a href="tel:+32471358826">+32 471 35 88 26</a><br>
+      <strong>BTW:</strong> BE-0795.359.418</p>
+    </div>
   </main>
 </body>
 </html>
