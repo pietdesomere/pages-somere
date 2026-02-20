@@ -73,6 +73,64 @@
       padding: 1rem 1rem 0.5rem;
     }
 
+    form {
+      margin-top: 1rem;
+      display: grid;
+      gap: 0.9rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+
+    label {
+      display: grid;
+      gap: 0.35rem;
+      font-weight: 600;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 0.65rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font: inherit;
+      color: inherit;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 130px;
+      resize: vertical;
+    }
+
+    .submit {
+      display: inline-block;
+      border: 0;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .status {
+      font-size: 0.95rem;
+      margin-top: 0.35rem;
+    }
+
+    .status.ok {
+      color: #065f46;
+    }
+
+    .status.error {
+      color: #7c2d12;
+    }
+
     a {
       color: var(--accent);
       text-decoration: none;
@@ -108,6 +166,135 @@
       <p><strong>Gsm:</strong> <a href="tel:+32471358826">+32 471 35 88 26</a><br>
       <strong>BTW:</strong> BE-0795.359.418</p>
     </div>
+
+    <h2>Informatieaanvraag</h2>
+    <p>Wil je meer informatie? Heb je een project maar weet je niet hoe je eraan kan beginnen? Stuur een berichtje en we kunnen samen bekijken hoe wij kunnen helpen.</p>
+
+    <form id="infoForm">
+      <input type="hidden" id="honeypot" name="honeypot" value="">
+
+      <label for="fullName">
+        Naam
+        <input id="fullName" name="fullName" type="text" required>
+      </label>
+
+      <label for="email">
+        E-mailadres
+        <input id="email" name="email" type="email" required>
+      </label>
+
+      <label for="company">
+        Bedrijf of organisatie (optioneel)
+        <input id="company" name="company" type="text">
+      </label>
+
+      <label for="phone">
+        Telefoonnummer (optioneel)
+        <input id="phone" name="phone" type="text">
+      </label>
+
+      <label for="projectType">
+        Type project (optioneel)
+        <select id="projectType" name="projectType">
+          <option value="">Kies een type</option>
+          <option value="Android app">Android app</option>
+          <option value="Website">Website</option>
+          <option value="Webapplicatie">Webapplicatie</option>
+          <option value="Combinatie">Combinatie</option>
+          <option value="Nog niet zeker">Nog niet zeker</option>
+        </select>
+      </label>
+
+      <label for="budget">
+        Budgetindicatie (optioneel)
+        <select id="budget" name="budget">
+          <option value="">Kies een budgetindicatie</option>
+          <option value="Tot 1.000 EUR">Tot 1.000 EUR</option>
+          <option value="1.000 - 2.500 EUR">1.000 - 2.500 EUR</option>
+          <option value="2.500 - 5.000 EUR">2.500 - 5.000 EUR</option>
+          <option value="5.000+ EUR">5.000+ EUR</option>
+          <option value="Nog te bepalen">Nog te bepalen</option>
+        </select>
+      </label>
+
+      <label for="message">
+        Beschrijving van je project
+        <textarea id="message" name="message" required placeholder="Beschrijf kort wat je wil bouwen en welke timing je voor ogen hebt."></textarea>
+      </label>
+
+      <button class="submit" type="submit">Verstuur informatieaanvraag</button>
+      <p class="hint">Je bericht wordt rechtstreeks doorgestuurd naar Somere BV.</p>
+      <p id="infoStatusMessage" class="status" aria-live="polite"></p>
+    </form>
   </main>
+
+  <script>
+    (function () {
+      var form = document.getElementById("infoForm");
+      var submitButton = form.querySelector("button[type='submit']");
+      var statusMessage = document.getElementById("infoStatusMessage");
+      var endpoint = "https://mail-sender-production.up.railway.app/send-info-request";
+
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        var fullName = document.getElementById("fullName").value.trim();
+        var email = document.getElementById("email").value.trim();
+        var company = document.getElementById("company").value.trim();
+        var phone = document.getElementById("phone").value.trim();
+        var projectType = document.getElementById("projectType").value;
+        var budget = document.getElementById("budget").value;
+        var message = document.getElementById("message").value.trim();
+        var honeypot = document.getElementById("honeypot").value;
+
+        statusMessage.textContent = "";
+        statusMessage.className = "status";
+        submitButton.disabled = true;
+        submitButton.textContent = "Bezig met verzenden...";
+
+        try {
+          var response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              fullName: fullName,
+              email: email,
+              company: company,
+              phone: phone,
+              projectType: projectType,
+              budget: budget,
+              message: message,
+              honeypot: honeypot
+            })
+          });
+
+          if (!response.ok) {
+            var errorText = "Verzenden mislukt. Probeer later opnieuw.";
+            try {
+              var data = await response.json();
+              if (data && data.error) {
+                errorText = "Verzenden mislukt: " + data.error;
+              }
+            } catch (_ignore) {
+            }
+            throw new Error(errorText);
+          }
+
+          form.reset();
+          document.getElementById("honeypot").value = "";
+          statusMessage.textContent = "Bedankt! Je aanvraag werd succesvol verzonden. We nemen zo snel mogelijk contact op.";
+          statusMessage.className = "status ok";
+        } catch (error) {
+          statusMessage.textContent = (error.message || "Er ging iets mis bij het verzenden.") + " Als dit probleem blijft optreden, neem dan contact op via +32 471 35 88 26.";
+          statusMessage.className = "status error";
+        } finally {
+          submitButton.disabled = false;
+          submitButton.textContent = "Verstuur informatieaanvraag";
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
