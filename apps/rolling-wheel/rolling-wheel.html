@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rolling Wheel</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px;
+      font-family: sans-serif;
+      min-height: 100vh;
+    }
+    h1 {
+      color: #ddd;
+      font-size: 1.2rem;
+      font-weight: 400;
+      margin: 0 0 20px;
+      letter-spacing: 0.05em;
+    }
+    .canvas-row {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      max-width: 1020px;
+      align-items: stretch;
+    }
+    #canvas {
+      display: block;
+      flex: 1;
+      border-radius: 10px;
+      background: black;
+    }
+    #speedo {
+      display: block;
+      width: 160px;
+      flex-shrink: 0;
+      border-radius: 10px;
+      background: black;
+    }
+    .top-bar {
+      width: 100%;
+      max-width: 1020px;
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    a.back {
+      color: #666;
+      text-decoration: none;
+      font-size: 0.85rem;
+      letter-spacing: 0.04em;
+      transition: color 0.15s;
+    }
+    a.back:hover { color: #ddd; }
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 12px;
+    }
+    button {
+      padding: 10px 32px;
+      font-size: 15px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #4a90d9;
+      color: white;
+      transition: background 0.15s;
+    }
+    button:hover { background: #357abd; }
+    #resetBtn { background: #666; }
+    #resetBtn:hover { background: #444; }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <a class="back" href="../index.html">← Animations</a>
+  </div>
+  <h1>Rolling Wheel</h1>
+  <div class="canvas-row">
+    <canvas id="canvas"></canvas>
+    <canvas id="speedo"></canvas>
+  </div>
+  <div class="controls">
+    <button id="startStopBtn">Start</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx    = canvas.getContext('2d');
+    const speedo = document.getElementById('speedo');
+    const sctx   = speedo.getContext('2d');
+    const startStopBtn = document.getElementById('startStopBtn');
+    const resetBtn     = document.getElementById('resetBtn');
+
+    const CANVAS_HEIGHT = 300;
+    const r = 60;               // wheel radius
+    const ROAD_Y = 240;         // y-coordinate of the road
+    const ANGULAR_SPEED = 1.5;  // radians per second
+
+    // Wheel center starts at x = r so the wheel is fully on screen
+    const START_CX = r;
+
+    let theta = 0;
+    let running = false;
+    let lastTimestamp = null;
+    let trail = [];
+    let animId = null;
+
+    // Position of the red dot for a given rotation angle theta.
+    // Dot starts at the TOP of the wheel (theta = 0).
+    function dotPos(t) {
+      const cx = START_CX + r * t;
+      const cy = ROAD_Y - r;
+      return {
+        x: cx + r * Math.sin(t),
+        y: cy - r * Math.cos(t)
+      };
+    }
+
+    function draw() {
+      const w = canvas.width;
+
+      ctx.clearRect(0, 0, w, CANVAS_HEIGHT);
+
+      // Road
+      ctx.beginPath();
+      ctx.moveTo(0, ROAD_Y);
+      ctx.lineTo(w, ROAD_Y);
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Trail
+      if (trail.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(trail[0].x, trail[0].y);
+        for (let i = 1; i < trail.length; i++) {
+          ctx.lineTo(trail[i].x, trail[i].y);
+        }
+        ctx.strokeStyle = '#d63030';
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+
+      // Wheel (only draw if any part is on screen)
+      const cx = START_CX + r * theta;
+      const cy = ROAD_Y - r;
+      if (cx + r > 0 && cx - r < w) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = '#bbb';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Red dot on rim
+        const dot = dotPos(theta);
+        ctx.beginPath();
+        ctx.arc(dot.x, dot.y, 6, 0, Math.PI * 2);
+        ctx.fillStyle = '#d63030';
+        ctx.fill();
+      }
+
+      // Horizontal speed: fraction = (1 + cos θ) / 2, range [0, 1]
+      // Absolute speed:   |v| = 2rω|cos(θ/2)|, same max → fraction = |cos(θ/2)|
+      // Center speed is constant: r·ω / (2r·ω) = 0.5 → needle always points north
+      const fractionCenter = 0.5;
+      const fractionH      = (1 + Math.cos(theta)) / 2;
+
+      const sw = speedo.width, sh = speedo.height;
+      sctx.clearRect(0, 0, sw, sh);
+
+      const sr = 42;
+      drawSpeedometer(sw / 2, sh * 0.27, sr, fractionCenter, 'center');
+
+      sctx.beginPath();
+      sctx.moveTo(sw * 0.1, sh * 0.5);
+      sctx.lineTo(sw * 0.9, sh * 0.5);
+      sctx.strokeStyle = '#222';
+      sctx.lineWidth = 1;
+      sctx.stroke();
+
+      drawSpeedometer(sw / 2, sh * 0.75, sr, fractionH,      'h. speed');
+    }
+
+    // Draw one speedometer gauge centred at (sx, sy) with radius sr.
+    // fraction: 0 = zero speed (needle NW), 1 = max speed (needle NE)
+    function drawSpeedometer(sx, sy, sr, fraction, label) {
+      const startAngle = -3 * Math.PI / 4; // NW
+      const sweepAngle = Math.PI / 2;       // NW → N → NE
+      const needleAngle = startAngle + fraction * sweepAngle;
+
+      // Track arc (full range, dark)
+      sctx.beginPath();
+      sctx.arc(sx, sy, sr, startAngle, startAngle + sweepAngle);
+      sctx.strokeStyle = '#2a2a2a';
+      sctx.lineWidth = 8;
+      sctx.lineCap = 'butt';
+      sctx.stroke();
+
+      // Active arc (NW → current speed)
+      if (fraction > 0.005) {
+        sctx.beginPath();
+        sctx.arc(sx, sy, sr, startAngle, needleAngle);
+        sctx.strokeStyle = 'white';
+        sctx.lineWidth = 8;
+        sctx.lineCap = 'butt';
+        sctx.stroke();
+      }
+
+      // Endpoint labels: "0" at NW, "max" at NE
+      sctx.font = '10px sans-serif';
+      sctx.textBaseline = 'middle';
+      const endpoints = [
+        [startAngle,              '0',   'right'],
+        [startAngle + sweepAngle, 'max', 'left' ],
+      ];
+      for (const [a, text, align] of endpoints) {
+        sctx.fillStyle = '#666';
+        sctx.textAlign = align;
+        sctx.fillText(text, sx + (sr + 16) * Math.cos(a), sy + (sr + 16) * Math.sin(a));
+      }
+
+      // Needle
+      sctx.beginPath();
+      sctx.moveTo(sx, sy);
+      sctx.lineTo(
+        sx + sr * 0.72 * Math.cos(needleAngle),
+        sy + sr * 0.72 * Math.sin(needleAngle)
+      );
+      sctx.strokeStyle = '#d63030';
+      sctx.lineWidth = 2;
+      sctx.lineCap = 'round';
+      sctx.stroke();
+
+      // Center dot
+      sctx.beginPath();
+      sctx.arc(sx, sy, 4, 0, Math.PI * 2);
+      sctx.fillStyle = 'white';
+      sctx.fill();
+
+      // Label below arc
+      sctx.font = '10px sans-serif';
+      sctx.fillStyle = '#555';
+      sctx.textAlign = 'center';
+      sctx.textBaseline = 'top';
+      sctx.fillText(label, sx, sy + sr + 8);
+    }
+
+    function animate(timestamp) {
+      if (!running) return;
+
+      if (lastTimestamp === null) lastTimestamp = timestamp;
+      const dt = Math.min((timestamp - lastTimestamp) / 1000, 0.05);
+      lastTimestamp = timestamp;
+
+      theta += ANGULAR_SPEED * dt;
+      trail.push(dotPos(theta));
+
+      draw();
+
+      // Stop when wheel has fully left the right edge
+      if (START_CX + r * theta - r > canvas.width) {
+        running = false;
+        startStopBtn.textContent = 'Start';
+        lastTimestamp = null;
+        return;
+      }
+
+      animId = requestAnimationFrame(animate);
+    }
+
+    function start() {
+      if (START_CX + r * theta - r > canvas.width) return; // already finished
+      running = true;
+      startStopBtn.textContent = 'Stop';
+      lastTimestamp = null;
+      animId = requestAnimationFrame(animate);
+    }
+
+    function stop() {
+      running = false;
+      startStopBtn.textContent = 'Start';
+      if (animId) cancelAnimationFrame(animId);
+    }
+
+    function reset() {
+      stop();
+      theta = 0;
+      trail = [];
+      draw();
+    }
+
+    startStopBtn.addEventListener('click', () => {
+      if (running) stop(); else start();
+    });
+
+    resetBtn.addEventListener('click', reset);
+
+    function resize() {
+      canvas.width  = canvas.offsetWidth;
+      canvas.height = CANVAS_HEIGHT;
+      speedo.width  = speedo.offsetWidth;
+      speedo.height = CANVAS_HEIGHT;
+      draw();
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+  </script>
+</body>
+</html>
