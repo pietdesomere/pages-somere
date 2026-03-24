@@ -76,6 +76,10 @@
     button:hover { background: #357abd; }
     #resetBtn { background: #666; }
     #resetBtn:hover { background: #444; }
+    #recordBtn { background: #555; }
+    #recordBtn:hover { background: #444; }
+    #recordBtn.recording { background: #a02020; }
+    #recordBtn.recording:hover { background: #c02828; }
   </style>
 </head>
 <body>
@@ -87,18 +91,29 @@
     <canvas id="canvas"></canvas>
     <canvas id="speedo"></canvas>
   </div>
+  <!-- Hidden composite canvas used for recording both canvases together -->
+  <canvas id="composite" style="display:none"></canvas>
   <div class="controls">
     <button id="startStopBtn">Start</button>
     <button id="resetBtn">Reset</button>
+    <button id="recordBtn">Record</button>
   </div>
 
   <script>
-    const canvas = document.getElementById('canvas');
-    const ctx    = canvas.getContext('2d');
-    const speedo = document.getElementById('speedo');
-    const sctx   = speedo.getContext('2d');
+    const canvas    = document.getElementById('canvas');
+    const ctx       = canvas.getContext('2d');
+    const speedo    = document.getElementById('speedo');
+    const sctx      = speedo.getContext('2d');
+    const composite = document.getElementById('composite');
+    const cctx      = composite.getContext('2d');
     const startStopBtn = document.getElementById('startStopBtn');
     const resetBtn     = document.getElementById('resetBtn');
+    const recordBtn    = document.getElementById('recordBtn');
+
+    const CANVAS_GAP = 12; // matches CSS gap between canvas and speedo
+
+    let mediaRecorder   = null;
+    let recordedChunks  = [];
 
     const CANVAS_HEIGHT = 300;
     const r = 60;               // wheel radius
@@ -190,6 +205,12 @@
       sctx.stroke();
 
       drawSpeedometer(sw / 2, sh * 0.75, sr, fractionH,      'h. speed');
+
+      // Mirror both canvases onto the composite canvas for recording
+      cctx.fillStyle = 'black';
+      cctx.fillRect(0, 0, composite.width, composite.height);
+      cctx.drawImage(canvas, 0, 0);
+      cctx.drawImage(speedo, canvas.width + CANVAS_GAP, 0);
     }
 
     // Draw one speedometer gauge centred at (sx, sy) with radius sr.
@@ -306,11 +327,46 @@
 
     resetBtn.addEventListener('click', reset);
 
+    recordBtn.addEventListener('click', () => {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      } else {
+        if (!composite.captureStream) {
+          alert('Recording is not supported in this browser. Try Chrome or Firefox.');
+          return;
+        }
+        recordedChunks = [];
+        const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+          ? 'video/webm;codecs=vp9' : 'video/webm';
+        const stream = composite.captureStream(60);
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+        mediaRecorder.ondataavailable = e => {
+          if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(recordedChunks, { type: 'video/webm' });
+          const url  = URL.createObjectURL(blob);
+          const a    = document.createElement('a');
+          a.href     = url;
+          a.download = 'rolling-wheel.webm';
+          a.click();
+          URL.revokeObjectURL(url);
+          recordBtn.textContent = 'Record';
+          recordBtn.classList.remove('recording');
+        };
+        mediaRecorder.start();
+        recordBtn.textContent = 'Stop recording';
+        recordBtn.classList.add('recording');
+      }
+    });
+
     function resize() {
       canvas.width  = canvas.offsetWidth;
       canvas.height = CANVAS_HEIGHT;
       speedo.width  = speedo.offsetWidth;
       speedo.height = CANVAS_HEIGHT;
+      composite.width  = canvas.width + CANVAS_GAP + speedo.width;
+      composite.height = CANVAS_HEIGHT;
       draw();
     }
 
